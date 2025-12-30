@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Logger</title>
+    <!-- Tailwind CSS for styling (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons for UI elements (CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans">
+
+    <!-- MAX WIDTH CONTAINER -->
+    <div class="max-w-2xl mx-auto p-4 sm:p-6">
+
+        <!-- HEADER -->
+        <header class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-indigo-600 flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-8 h-8"></i>
+                    Vocabulaire
+                </h1>
+                <p class="text-slate-500 text-sm">Capture new words, retain your knowledge.</p>
+            </div>
+            <button onclick="app.exportData()" class="text-slate-400 hover:text-indigo-600 transition-colors" title="Copy data to clipboard">
+                <i data-lucide="download" class="w-5 h-5"></i>
+            </button>
+        </header>
+
+        <!-- TABS -->
+        <div class="flex space-x-1 bg-slate-200 p-1 rounded-lg mb-8">
+            <button onclick="app.switchTab('fr')" id="tab-fr" class="flex-1 py-2 text-sm font-medium rounded-md transition-all">French</button>
+            <button onclick="app.switchTab('en')" id="tab-en" class="flex-1 py-2 text-sm font-medium rounded-md transition-all">English</button>
+        </div>
+
+        <!-- REVIEW SECTION (Conditionally displayed) -->
+        <div id="review-section" class="hidden mb-8 bg-white p-6 rounded-xl shadow-sm border border-indigo-100 ring-4 ring-indigo-50/50">
+            <div class="flex items-start gap-4">
+                <div class="bg-indigo-100 p-3 rounded-full text-indigo-600">
+                    <i data-lucide="brain-circuit" class="w-6 h-6"></i>
+                </div>
+                <div class="flex-1">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-1">Quick Review</h2>
+                    <p class="text-slate-600 text-sm mb-4">Can you use these words in a sentence? Click to reveal definitions.</p>
+                    
+                    <div id="review-cards" class="space-y-3">
+                        <!-- Review cards injected here via JS -->
+                    </div>
+
+                    <button onclick="app.dismissReview()" class="mt-4 text-xs font-medium text-indigo-600 hover:text-indigo-800 uppercase tracking-wide">
+                        Done for now
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- INPUT SECTION -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
+            <form id="add-word-form" onsubmit="app.handleSubmit(event)" class="space-y-4">
+                
+                <!-- Word Input -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">New Word (<span id="input-lang-label">French</span>)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="word-input" required placeholder="Type word here..." 
+                            class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+                        <button type="button" onclick="app.searchWiki()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-medium transition-colors flex items-center gap-2" title="Search Wiktionary">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                            <span class="hidden sm:inline">Search</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Definition Input -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Definition / Notes</label>
+                    <textarea id="def-input" required placeholder="Lasting for a very short time..." rows="2"
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"></textarea>
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-all transform active:scale-95 shadow-md hover:shadow-lg flex justify-center items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    Add to List
+                </button>
+            </form>
+        </div>
+
+        <!-- STATS & LIST HEADER -->
+        <div class="flex justify-between items-end mb-4 border-b border-slate-200 pb-2">
+            <h3 class="font-bold text-slate-700">Your Collection</h3>
+            <span id="word-count" class="text-xs font-mono bg-slate-200 text-slate-600 px-2 py-1 rounded">0 words</span>
+        </div>
+
+        <!-- WORD LIST -->
+        <div id="word-list" class="space-y-3">
+            <!-- List items injected here via JS -->
+            <div class="text-center py-12 text-slate-400">
+                <i data-lucide="library" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                <p>No words yet. Start reading!</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const app = {
+            data: [],
+            storageKey: 'vocab_logger_v1',
+            currentTab: 'fr',
+
+            init() {
+                // 1. Load data from localStorage
+                const stored = localStorage.getItem(this.storageKey);
+                if (stored) {
+                    this.data = JSON.parse(stored);
+                    
+                    // Migration: Tag legacy data as French if missing 'lang'
+                    let migrated = false;
+                    this.data.forEach(item => {
+                        if (!item.lang) {
+                            item.lang = 'fr';
+                            migrated = true;
+                        }
+                    });
+                    if (migrated) this.save();
+                }
+
+                // 2. Initialize UI
+                this.renderTabs();
+                this.renderList();
+                this.updateCount();
+                
+                // 3. Initialize Icons
+                lucide.createIcons();
+
+                // 4. Trigger Review logic
+                this.checkReview();
+            },
+
+            switchTab(lang) {
+                this.currentTab = lang;
+                this.renderTabs();
+                this.renderList();
+                this.updateCount();
+                
+                // Update input label
+                const labelMap = { 'fr': 'French', 'en': 'English' };
+                document.getElementById('input-lang-label').innerText = labelMap[lang];
+
+                // Refresh review for new language
+                this.checkReview();
+            },
+
+            renderTabs() {
+                const tabs = ['fr', 'en'];
+                tabs.forEach(t => {
+                    const btn = document.getElementById(`tab-${t}`);
+                    if (t === this.currentTab) {
+                        btn.className = 'flex-1 py-2 text-sm font-bold rounded-md bg-white text-indigo-600 shadow-sm transition-all';
+                    } else {
+                        btn.className = 'flex-1 py-2 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all';
+                    }
+                });
+            },
+
+            save() {
+                localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+                this.renderList();
+                this.updateCount();
+            },
+
+            handleSubmit(e) {
+                e.preventDefault();
+                const wordInput = document.getElementById('word-input');
+                const defInput = document.getElementById('def-input');
+
+                const newEntry = {
+                    id: Date.now(),
+                    word: wordInput.value.trim(),
+                    definition: defInput.value.trim(),
+                    lang: this.currentTab, // Tag with current language
+                    dateAdded: new Date().toISOString(),
+                    reviews: 0
+                };
+
+                // Add to beginning of array
+                this.data.unshift(newEntry);
+                this.save();
+
+                // Clear inputs and refocus
+                wordInput.value = '';
+                defInput.value = '';
+                wordInput.focus();
+            },
+
+            deleteWord(id) {
+                if(confirm('Remove this word?')) {
+                    this.data = this.data.filter(item => item.id !== id);
+                    this.save();
+                    this.checkReview(); 
+                }
+            },
+
+            searchWiki() {
+                const word = document.getElementById('word-input').value.trim();
+                if (word) {
+                    // Context aware hash
+                    const hash = this.currentTab === 'fr' ? '#French' : '#English';
+                    window.open(`https://en.wiktionary.org/wiki/${word}${hash}`, '_blank');
+                } else {
+                    alert('Please type a word first.');
+                }
+            },
+
+            checkReview() {
+                // Filter words by current language
+                const langData = this.data.filter(item => item.lang === this.currentTab);
+                const reviewSection = document.getElementById('review-section');
+                
+                // Need at least 1 word to review
+                if (langData.length < 1) {
+                    reviewSection.classList.add('hidden');
+                    return;
+                }
+
+                const reviewContainer = document.getElementById('review-cards');
+                
+                // Shuffle array and pick top 3
+                const shuffled = [...langData].sort(() => 0.5 - Math.random());
+                const toReview = shuffled.slice(0, 3);
+
+                reviewContainer.innerHTML = toReview.map(item => `
+                    <div class="group bg-slate-50 border border-slate-200 p-3 rounded-lg cursor-pointer hover:bg-white hover:border-indigo-300 transition-all" onclick="this.classList.toggle('revealed')">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-slate-700 text-lg">${item.word}</span>
+                            <span class="text-xs text-indigo-500 font-medium opacity-100 group-[.revealed]:opacity-0 transition-opacity">Click to reveal</span>
+                        </div>
+                        <div class="hidden group-[.revealed]:block mt-2 pt-2 border-t border-slate-100 text-slate-600 text-sm animate-fadeIn">
+                            ${item.definition}
+                        </div>
+                    </div>
+                `).join('');
+
+                reviewSection.classList.remove('hidden');
+                reviewSection.classList.add('fade-in');
+            },
+
+            dismissReview() {
+                const reviewSection = document.getElementById('review-section');
+                reviewSection.classList.add('hidden');
+            },
+
+            renderList() {
+                const container = document.getElementById('word-list');
+                // Filter by current language
+                const filteredData = this.data.filter(item => item.lang === this.currentTab);
+                
+                if (filteredData.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-12 text-slate-400">
+                            <p>No ${this.currentTab === 'fr' ? 'French' : 'English'} words logged yet.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = filteredData.map(item => `
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex justify-between items-start group hover:shadow-md transition-shadow">
+                        <div>
+                            <h4 class="text-lg font-bold text-slate-800">${item.word}</h4>
+                            <p class="text-slate-600 mt-1">${item.definition}</p>
+                            <span class="text-xs text-slate-400 mt-2 block">Added ${new Date(item.dateAdded).toLocaleDateString()}</span>
+                        </div>
+                        <button onclick="app.deleteWord(${item.id})" class="text-slate-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `).join('');
+                
+                lucide.createIcons();
+            },
+
+            updateCount() {
+                const count = this.data.filter(item => item.lang === this.currentTab).length;
+                document.getElementById('word-count').innerText = `${count} words`;
+            },
+
+            exportData() {
+                const dataStr = JSON.stringify(this.data, null, 2);
+                navigator.clipboard.writeText(dataStr).then(() => {
+                    alert('Data copied to clipboard! You can save this text file as a backup.');
+                });
+            }
+        };
+
+        // Start the app
+        app.init();
+    </script>
+</body>
+</html>
