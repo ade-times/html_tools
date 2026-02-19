@@ -102,11 +102,16 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
             <form id="add-word-form" onsubmit="app.handleSubmit(event)" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">New Word (<span id="input-lang-label">French</span>)</label>
+                    <!-- CHANGED: Default label is now English to match the state -->
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">New Word (<span id="input-lang-label">English</span>)</label>
                     <div class="flex gap-2">
                         <input type="text" id="word-input" required placeholder="Type word here..." 
                             class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
-                        <button type="button" onclick="app.searchWiki()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-medium transition-colors flex items-center gap-2" title="Search Wiktionary">
+                        <select id="dict-select" class="p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm text-slate-700">
+                            <option value="webster">Webster's 1913</option>
+                            <option value="wiki">Wiktionary</option>
+                        </select>
+                        <button type="button" onclick="app.searchDictionary()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-medium transition-colors flex items-center gap-2" title="Search Dictionary">
                             <i data-lucide="search" class="w-4 h-4"></i>
                             <span class="hidden sm:inline">Search</span>
                         </button>
@@ -141,7 +146,8 @@
             data: [],
             storageKey: 'vocab_logger_v1',
             configKey: 'vocab_logger_config',
-            currentTab: 'fr',
+            // CHANGED: Default tab is now English
+            currentTab: 'en',
             config: {
                 token: '',
                 gistId: ''
@@ -322,6 +328,22 @@
                 this.updateCount();
                 const labelMap = { 'fr': 'French', 'en': 'English' };
                 document.getElementById('input-lang-label').innerText = labelMap[lang];
+                
+                // Update default dictionary and manage Webster's availability
+                const dictSelect = document.getElementById('dict-select');
+                if (dictSelect) {
+                    const websterOption = dictSelect.querySelector('option[value="webster"]');
+                    if (lang === 'fr') {
+                        dictSelect.value = 'wiki';
+                        websterOption.disabled = true;
+                        websterOption.text = "Webster's (EN only)";
+                    } else {
+                        dictSelect.value = 'webster';
+                        websterOption.disabled = false;
+                        websterOption.text = "Webster's 1913";
+                    }
+                }
+
                 this.checkReview();
             },
 
@@ -367,11 +389,16 @@
                 }
             },
 
-            searchWiki() {
+            searchDictionary() {
                 const word = document.getElementById('word-input').value.trim();
+                const dict = document.getElementById('dict-select').value;
                 if (word) {
-                    const hash = this.currentTab === 'fr' ? '#French' : '#English';
-                    window.open(`https://en.wiktionary.org/wiki/${word}${hash}`, '_blank');
+                    if (dict === 'wiki') {
+                        const hash = this.currentTab === 'fr' ? '#French' : '#English';
+                        window.open(`https://en.wiktionary.org/wiki/${word}${hash}`, '_blank');
+                    } else if (dict === 'webster') {
+                        window.open(`https://www.websters1913.com/words/${word}`, '_blank');
+                    }
                 } else {
                     alert('Please type a word first.');
                 }
@@ -441,8 +468,22 @@
 
             exportData() {
                 const dataStr = JSON.stringify(this.data, null, 2);
+                document.execCommand('copy'); // Fallback for some iframe scenarios
                 navigator.clipboard.writeText(dataStr).then(() => {
                     alert('Data copied to clipboard!');
+                }).catch(err => {
+                    // Fallback using legacy execCommand if clipboard API fails
+                    const textArea = document.createElement("textarea");
+                    textArea.value = dataStr;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        alert('Data copied to clipboard!');
+                    } catch (e) {
+                        alert('Failed to copy. Your browser might block this action.');
+                    }
+                    document.body.removeChild(textArea);
                 });
             }
         };
