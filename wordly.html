@@ -102,20 +102,29 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
             <form id="add-word-form" onsubmit="app.handleSubmit(event)" class="space-y-4">
                 <div>
-                    <!-- CHANGED: Default label is now English to match the state -->
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">New Word (<span id="input-lang-label">English</span>)</label>
-                    <div class="flex gap-2">
+                    
+                    <!-- RESPONSIVE ROW: Stacks on mobile, inline on sm (tablets/desktops) -->
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <!-- Input takes full width on mobile, fills remaining space on larger screens -->
                         <input type="text" id="word-input" required placeholder="Type word here..." 
-                            class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
-                        <select id="dict-select" class="p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm text-slate-700">
-                            <option value="webster">Webster's 1913</option>
-                            <option value="wiki">Wiktionary</option>
-                        </select>
-                        <button type="button" onclick="app.searchDictionary()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-medium transition-colors flex items-center gap-2" title="Search Dictionary">
-                            <i data-lucide="search" class="w-4 h-4"></i>
-                            <span class="hidden sm:inline">Search</span>
-                        </button>
+                            class="w-full sm:flex-1 p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+                        
+                        <!-- Wrapper for Select + Button to keep them together on mobile -->
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <!-- Select takes up flexible space on mobile, auto width on desktop -->
+                            <select id="dict-select" class="flex-1 sm:w-auto p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm text-slate-700">
+                                <option value="webster">Webster's 1913</option>
+                                <option value="wiki">Wiktionary</option>
+                            </select>
+                            
+                            <button type="button" onclick="app.searchDictionary()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-medium transition-colors flex items-center justify-center gap-2 min-w-[3rem]" title="Search Dictionary">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                                <span class="hidden sm:inline">Search</span>
+                            </button>
+                        </div>
                     </div>
+
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Definition / Notes</label>
@@ -146,7 +155,6 @@
             data: [],
             storageKey: 'vocab_logger_v1',
             configKey: 'vocab_logger_config',
-            // CHANGED: Default tab is now English
             currentTab: 'en',
             config: {
                 token: '',
@@ -309,8 +317,6 @@
                     
                     if (fileContent) {
                         const cloudData = JSON.parse(fileContent);
-                        // Merge Strategy: Cloud overwrites local for simplicity in this version
-                        // Ideally, you'd compare timestamps.
                         this.data = cloudData;
                         this.saveLocal();
                         if (!silent) this.updateSyncStatus(`Pulled ${this.data.length} words from cloud.`);
@@ -373,7 +379,7 @@
 
                 this.data.unshift(newEntry);
                 this.saveLocal();
-                this.syncUp(); // Trigger cloud save
+                this.syncUp();
 
                 wordInput.value = '';
                 defInput.value = '';
@@ -468,11 +474,10 @@
 
             exportData() {
                 const dataStr = JSON.stringify(this.data, null, 2);
-                document.execCommand('copy'); // Fallback for some iframe scenarios
+                document.execCommand('copy');
                 navigator.clipboard.writeText(dataStr).then(() => {
                     alert('Data copied to clipboard!');
                 }).catch(err => {
-                    // Fallback using legacy execCommand if clipboard API fails
                     const textArea = document.createElement("textarea");
                     textArea.value = dataStr;
                     document.body.appendChild(textArea);
